@@ -1,6 +1,7 @@
 import time
 import datetime
 import os
+import requests
 
 from binance.client import Client
 from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET
@@ -10,6 +11,7 @@ API_SECRET = os.getenv('BINANCE_API_SECRET')
 
 client = Client(API_KEY, API_SECRET)
 print("🚀 Bot de trading iniciado com sucesso.")
+print("🌍 IP público da aplicação:", requests.get("https://api.ipify.org").text)
 
 symbols = ['BTCUSDT', 'ETHUSDT', 'LINKUSDT']
 timeframe = '1h'
