@@ -9,6 +9,7 @@ API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 
 client = Client(API_KEY, API_SECRET)
+print("🚀 Bot de trading iniciado com sucesso.")
 
 symbols = ['BTCUSDT', 'ETHUSDT', 'LINKUSDT']
 timeframe = '1h'
