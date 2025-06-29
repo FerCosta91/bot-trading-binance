@@ -4,15 +4,18 @@ import os
 import requests
 
 from binance.client import Client
-from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET
+from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET, ORDER_TYPE_STOP_MARKET
 
+# ⚙️ Variáveis de ambiente (definidas nos secrets do Fly.io)
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 
+# 🔌 Conexão com a Binance
 client = Client(API_KEY, API_SECRET)
-print("🚀 Bot de trading iniciado com sucesso.")
-print("🌍 IP público da aplicação:", requests.get("https://api.ipify.org").text)
+print("🤖 Bot de trading iniciado com sucesso.")
+print("🌐 IP público da aplicação:", requests.get("https://api.ipify.org").text)
 
+# 🪙 Configurações do bot
 symbols = ['BTCUSDT', 'AVAXUSDT', 'LINKUSDT']
 timeframe = '1h'
 short_ma = 9
@@ -20,9 +23,10 @@ long_ma = 21
 risk_usdc = 1
 reward_usdc = 2
 
+# 📈 Funções auxiliares
 def get_klines(symbol, interval, limit=100):
     candles = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
-    return [float(x[4]) for x in candles]  # preÃ§o de fecho
+    return [float(x[4]) for x in candles]  # Preço de fecho
 
 def calculate_ma(prices, period):
     return sum(prices[-period:]) / period
@@ -41,12 +45,12 @@ def place_trade(symbol, direction):
         quantity=quantity
     )
 
-    # Tentativa de obter o preÃ§o de execuÃ§Ã£o real (nem sempre disponÃ­vel)
+    # Tenta obter o preço real de entrada (fills)
     fills = order.get('fills', [])
     if fills and 'price' in fills[0]:
         entry_price = float(fills[0]['price'])
     else:
-        entry_price = price  # fallback para o mark price
+        entry_price = price
 
     stop_price = entry_price - 1 if direction == 'buy' else entry_price + 1
     target_price = entry_price + 2 if direction == 'buy' else entry_price - 2
@@ -61,8 +65,9 @@ def place_trade(symbol, direction):
 
     print(f"\n{symbol} -> {direction.upper()} | Entry: {entry_price:.2f}, SL: {stop_price:.2f}, TP: {target_price:.2f}")
 
-while True:
-    print(f"\nInÃ­cio da execuÃ§Ã£o Ã s {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+# 🚀 Execução principal
+def main():
+    print(f"\nInício da execução às {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     for symbol in symbols:
         try:
             prices = get_klines(symbol, timeframe)
@@ -83,12 +88,11 @@ while True:
         except Exception as e:
             print(f"Erro ao processar {symbol}: {e}")
 
-    print("ExecuÃ§Ã£o completa. A aguardar 1 hora...\n")
+    print("\n✅ Execução completa. A aguardar 1 hora...\n")
     time.sleep(60 * 60)
 
-import time
-
-while True:
-    print("⏳ Bot em execução...")  # Opcional, só para confirmar no log
-    time.sleep(60)  # Espera 60 segundos antes do próximo loop
-# Manter bot ativo após execução principal
+# ♻️ Loop infinito
+if __name__ == "__main__":
+    while True:
+        print("⏳ Bot em execução...\n")
+        main()
