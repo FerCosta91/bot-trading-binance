@@ -13,7 +13,7 @@ client = Client(API_KEY, API_SECRET)
 print("🚀 Bot de trading iniciado com sucesso.")
 print("🌍 IP público da aplicação:", requests.get("https://api.ipify.org").text)
 
-symbols = ['BTCUSDT', 'ETHUSDT', 'LINKUSDT']
+symbols = ['SOLUSDT', 'AVAXUSDT', 'LINKUSDT']
 timeframe = '1h'
 short_ma = 9
 long_ma = 21
