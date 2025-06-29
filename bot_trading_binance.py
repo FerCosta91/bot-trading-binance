@@ -41,7 +41,7 @@ def place_trade(symbol, direction):
     order = client.futures_create_order(
         symbol=symbol,
         side=side,
-        type=ORDER_TYPE_MARKET,
+        type="STOP_MARKET",
         quantity=quantity
     )
 
