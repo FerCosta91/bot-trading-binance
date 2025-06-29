@@ -40,10 +40,9 @@ def place_trade(symbol, direction):
 
     order = client.futures_create_order(
         symbol=symbol,
-        side=oposite,
-        type="STOP_MARKET",
-        stopPrice=round(stop_price, 2)
-        closePosition=True
+        side=side,
+        type=ORDER_TYPE_MARKET,
+        quantity=quantity
     )
 
     fills = order.get('fills', [])
@@ -55,9 +54,16 @@ def place_trade(symbol, direction):
     stop_price = entry_price - 1 if direction == 'buy' else entry_price + 1
     target_price = entry_price + 2 if direction == 'buy' else entry_price - 2
 
-    print(f"Ordem de {direction.upper()} executada. Stop fictício em {stop_price:.2f}, alvo em {target_price:.2f}")
+    client.futures_create_order(
+        symbol=symbol,
+        side=opposite,
+        type='STOP_MARKET',
+        stopPrice=round(stop_price, 2),
+        closePosition=True
+    )
 
     print(f"\n{symbol} -> {direction.upper()} | Entry: {entry_price:.2f}, SL: {stop_price:.2f}, TP: {target_price:.2f}")
+    print(f"Ordem de {direction.upper()} executada. Stop fictício em {stop_price:.2f}, alvo em {target_price:.2f}")
 
 # 🔁 Execução contínua
 def main():
