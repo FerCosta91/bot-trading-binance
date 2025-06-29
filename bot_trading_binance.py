@@ -86,3 +86,9 @@ while True:
     print("ExecuÃ§Ã£o completa. A aguardar 1 hora...\n")
     time.sleep(60 * 60)
 
+import time
+
+while True:
+    print("⏳ Bot em execução...")  # Opcional, só para confirmar no log
+    time.sleep(60)  # Espera 60 segundos antes do próximo loop
+# Manter bot ativo após execução principal
