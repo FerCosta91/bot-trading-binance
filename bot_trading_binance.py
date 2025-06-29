@@ -40,9 +40,10 @@ def place_trade(symbol, direction):
 
     order = client.futures_create_order(
         symbol=symbol,
-        side=side,
+        side=oposite,
         type="STOP_MARKET",
-        quantity=quantity
+        stopPrice=round(stop_price, 2)
+        closePosition=True
     )
 
     fills = order.get('fills', [])
