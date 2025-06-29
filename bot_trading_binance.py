@@ -4,7 +4,7 @@ import os
 import requests
 
 from binance.client import Client
-from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET, ORDER_TYPE_STOP_MARKET
+from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET
 
 # ⚙️ Variáveis de ambiente
 API_KEY = os.getenv('BINANCE_API_KEY')
