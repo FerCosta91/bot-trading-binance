@@ -2,7 +2,7 @@ import time
 import datetime
 import os
 import requests
-# teste 
+
 from binance.client import Client
 from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET
 
