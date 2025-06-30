@@ -6,13 +6,16 @@ import requests
 from binance.client import Client
 from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET
 
+# ⚙️ Variáveis de ambiente
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 
+# 🔌 Conexão com a Binance
 client = Client(API_KEY, API_SECRET)
 print("🤖 Bot de trading iniciado com sucesso.")
 print("🌐 IP público da aplicação:", requests.get("https://api.ipify.org").text)
 
+# 🪙 Configurações
 symbols = ['BTCUSDT', 'AVAXUSDT', 'LINKUSDT']
 timeframe = '1h'
 short_ma = 9
@@ -20,9 +23,10 @@ long_ma = 21
 risk_usdc = 1
 reward_usdc = 2
 
+# 📊 Funções auxiliares
 def get_klines(symbol, interval, limit=100):
     candles = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
-    return [float(x[4]) for x in candles]
+    return [float(x[4]) for x in candles]  # Preço de fecho
 
 def calculate_ma(prices, period):
     return sum(prices[-period:]) / period
@@ -53,7 +57,7 @@ def place_trade(symbol, direction):
     client.futures_create_order(
         symbol=symbol,
         side=opposite,
-        type='STOP_MARKET',
+        type='STOP_MARKET',  # Usamos string aqui porque não há enum oficial
         stopPrice=round(stop_price, 2),
         closePosition=True
     )
@@ -61,6 +65,7 @@ def place_trade(symbol, direction):
     print(f"\n{symbol} -> {direction.upper()} | Entry: {entry_price:.2f}, SL: {stop_price:.2f}, TP: {target_price:.2f}")
     print(f"Ordem de {direction.upper()} executada. Stop fictício em {stop_price:.2f}, alvo em {target_price:.2f}")
 
+# 🔁 Execução contínua
 def main():
     while True:
         print(f"\n⏳ Execução às {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
