@@ -57,7 +57,7 @@ def place_trade(symbol, direction):
     client.futures_create_order(
         symbol=symbol,
         side=opposite,
-        type='STOP_MARKET',  # Usamos string aqui porque não há enum oficial
+        type='STOP_MARKET',  # ← aqui é string literal
         stopPrice=round(stop_price, 2),
         closePosition=True
     )
