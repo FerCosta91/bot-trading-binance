@@ -1,164 +1,127 @@
+import os
 import time
 import datetime
-import os
+import csv
 import requests
 from decimal import Decimal, ROUND_DOWN, getcontext
 from binance.client import Client
-from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_MARKET
-
-ORDER_TYPE_STOP_MARKET = 'STOP_MARKET'
-ORDER_TYPE_LIMIT = 'LIMIT'
+from binance.enums import *
 
 getcontext().prec = 8
 
+# 🔐 Variáveis de ambiente
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+
+# 🔗 Cliente Binance
 client = Client(API_KEY, API_SECRET)
 
-print("🤖 Bot iniciado com sucesso.")
-print("🌍 IP público:", requests.get("https://api.ipify.org").text)
-
+# 🧪 Configuração dos ativos
 symbols = ['SOLUSDT', 'ETHUSDT', 'XRPUSDT']
 timeframe = '1h'
-short_ma = 9
-long_ma = 21
-trend_ma = 200
-risk_usdc = Decimal('1')
-rr = Decimal('1.5')
+short_ema = 9
+long_ema = 21
+trend_ema = 200
+risk_per_trade = Decimal('1')  # 1 USDC
+rr_ratio = Decimal('1.5')  # risco:recompensa
+volume_multiplier = 1.2  # volume precisa estar 20% acima da média
 
-symbol_specs = {
-    'SOLUSDT': {'precision': 2, 'min_notional': Decimal('5')},
-    'ETHUSDT': {'precision': 3, 'min_notional': Decimal('20')},
-    'XRPUSDT': {'precision': 1, 'min_notional': Decimal('5')}
-}
+# 📁 Arquivo de log
+log_file = 'trades_log.csv'
+if not os.path.exists(log_file):
+    with open(log_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['timestamp', 'symbol', 'mensagem'])
 
-def log(msg):
+def log_trade(symbol, mensagem):
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    linha = f"[{timestamp}] {msg}"
-    with open("logs.txt", "a") as f:
-        f.write(linha + "\n")
-    print(linha)
+    with open(log_file, 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([timestamp, symbol, mensagem])
 
-def get_klines(symbol, interval, limit=200):
-    return client.futures_klines(symbol=symbol, interval=interval, limit=limit)
-
-def calculate_ma(prices, period):
-    return sum(prices[-period:]) / period
-
-def round_quantity(qty, decimals):
-    return qty.quantize(Decimal('1.' + '0'*decimals), rounding=ROUND_DOWN)
-
-def is_trending(prices, ma200, threshold=0.3):  # antes 0.5%
-    return abs(prices[-1] - ma200) / ma200 > (threshold / 100)
-
-def volume_ok(volumes):
-    return float(volumes[-1]) >= 0.75 * (sum(map(float, volumes[-20:-1])) / 19)  # antes 0.9
-
-def is_position_open(symbol):
-    positions = client.futures_position_information(symbol=symbol)
-    for pos in positions:
-        if float(pos['positionAmt']) != 0:
-            return True
-    return False
-
-def place_trade(symbol, direction, entry_price, stop_price):
-    spec = symbol_specs[symbol]
-    precision = spec['precision']
-    min_notional = spec['min_notional']
-
-    stop_diff = abs(entry_price - stop_price)
-    quantity = round_quantity(risk_usdc / Decimal(stop_diff), precision)
-    notional = quantity * Decimal(entry_price)
-
-    if notional < min_notional:
-        log(f"⚠️ Ordem ignorada em {symbol}: notional={notional:.2f} < mínimo {min_notional}")
-        return
-
-    side = SIDE_BUY if direction == 'buy' else SIDE_SELL
-    opposite = SIDE_SELL if direction == 'buy' else SIDE_BUY
-    target_price = entry_price + stop_diff * rr if direction == 'buy' else entry_price - stop_diff * rr
-
+def enviar_telegram(mensagem):
     try:
-        client.futures_create_order(
-            symbol=symbol,
-            side=side,
-            type=ORDER_TYPE_MARKET,
-            quantity=float(quantity)
-        )
-
-        client.futures_create_order(
-            symbol=symbol,
-            side=opposite,
-            type=ORDER_TYPE_STOP_MARKET,
-            stopPrice=float(stop_price),
-            closePosition=True,
-            reduceOnly=True
-        )
-
-        client.futures_create_order(
-            symbol=symbol,
-            side=opposite,
-            type=ORDER_TYPE_LIMIT,
-            price=float(target_price),
-            timeInForce='GTC',
-            closePosition=True,
-            reduceOnly=True
-        )
-
-        log(f"✅ {symbol} -> {direction.upper()} | Entrada: {entry_price:.2f}, SL: {stop_price:.2f}, TP: {target_price:.2f}")
-
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mensagem}
+        requests.post(url, data=payload)
     except Exception as e:
-        log(f"❌ Erro ao executar ordens em {symbol}: {e}")
+        print("Erro ao enviar para o Telegram:", e)
 
-def main():
+def obter_dados(symbol, interval, limit=100):
+    klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
+    closes = [float(k[4]) for k in klines]
+    volumes = [float(k[5]) for k in klines]
+    highs = [float(k[2]) for k in klines]
+    lows = [float(k[3]) for k in klines]
+    return closes, volumes, highs, lows
+
+def calcular_ema(lista, período):
+    k = 2 / (período + 1)
+    ema = [sum(lista[:período]) / período]
+    for preço in lista[período:]:
+        ema.append((preço - ema[-1]) * k + ema[-1])
+    return ema
+
+def candle_forte(closes, highs, lows):
+    corpo = abs(closes[-1] - closes[-2])
+    range_candle = highs[-1] - lows[-1]
+    return corpo > 0.5 * range_candle
+
+def calcular_volume_acima_media(volumes):
+    média = sum(volumes[:-1]) / (len(volumes) - 1)
+    return volumes[-1] > média * volume_multiplier
+
+def calcular_quantidade(symbol, stop_prejuízo):
+    preco = float(client.get_symbol_ticker(symbol=symbol)['price'])
+    quantidade = (risk_per_trade / Decimal(stop_prejuízo)).quantize(Decimal('0.0001'), rounding=ROUND_DOWN)
+    return float(quantidade)
+
+def executar_bot():
+    print("🤖 Bot iniciado com sucesso.")
+    print("🌍 IP público:", requests.get("https://api.ipify.org").text)
+
     while True:
-        log(f"\n⏳ Execução às {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        agora = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"\n📅 Execução às {agora}")
         for symbol in symbols:
             try:
-                candles = get_klines(symbol, timeframe)
-                closes = [float(c[4]) for c in candles]
-                volumes = [float(c[5]) for c in candles]
-                last_candle = candles[-2]
-                prev_candle = candles[-3]
+                closes, volumes, highs, lows = obter_dados(symbol, timeframe)
+                ema_curta = calcular_ema(closes, short_ema)
+                ema_longa = calcular_ema(closes, long_ema)
+                ema_tendencia = calcular_ema(closes, trend_ema)
 
-                ma_short = calculate_ma(closes, short_ma)
-                ma_long = calculate_ma(closes, long_ma)
-                ma_200 = calculate_ma(closes, trend_ma)
+                tendência_alta = closes[-1] > ema_tendencia[-1]
+                cruzamento_alta = ema_curta[-2] < ema_longa[-2] and ema_curta[-1] > ema_longa[-1]
+                candle_ok = candle_forte(closes, highs, lows)
+                volume_ok = calcular_volume_acima_media(volumes)
 
-                if not is_trending(closes, ma_200):
-                    log(f"{symbol}: mercado lateral.")
-                    continue
+                if tendência_alta and cruzamento_alta and candle_ok and volume_ok:
+                    entrada = highs[-1]
+                    stop = lows[-1]
+                    alvo = entrada + (entrada - stop) * float(rr_ratio)
+                    quantidade = calcular_quantidade(symbol, entrada - stop)
 
-                if not volume_ok(volumes):
-                    log(f"{symbol}: volume abaixo da média.")
-                    continue
+                    mensagem = f"📈 Sinal de compra em {symbol}\nEntrada: {entrada:.4f}\nStop: {stop:.4f}\nAlvo: {alvo:.4f}\nQtd: {quantidade}"
+                    print(mensagem)
+                    log_trade(symbol, mensagem)
+                    enviar_telegram(mensagem)
 
-                if is_position_open(symbol):
-                    log(f"{symbol}: já existe posição aberta. Ignorado.")
-                    continue
-
-                mark_price = float(client.futures_mark_price(symbol=symbol)['markPrice'])
-                high = float(last_candle[2])
-                low = float(last_candle[3])
-                prev_high = float(prev_candle[2])
-                prev_low = float(prev_candle[3])
-
-                if ma_short > ma_long and mark_price > high:
-                    stop = Decimal(prev_low) - Decimal('0.01')
-                    place_trade(symbol, 'buy', Decimal(mark_price), stop)
-
-                elif ma_short < ma_long and mark_price < low:
-                    stop = Decimal(prev_high) + Decimal('0.01')
-                    place_trade(symbol, 'sell', Decimal(mark_price), stop)
+                    # Aqui pode-se colocar a ordem real, se desejar
+                    # client.futures_create_order(...)
 
                 else:
-                    log(f"{symbol}: sem sinal claro.")
+                    print(f"{symbol}: volume abaixo da média.")
+                    log_trade(symbol, "volume abaixo da média.")
 
             except Exception as e:
-                log(f"❌ Erro em {symbol}: {e}")
+                erro_msg = f"{symbol}: Erro ao processar - {e}"
+                print(erro_msg)
+                log_trade(symbol, erro_msg)
 
-        log("⏲️ Aguardar 5 minutos...\n")
+        print("🕔 Aguardar 5 minutos...")
         time.sleep(300)
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    executar_bot()
