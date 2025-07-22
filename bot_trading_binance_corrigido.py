@@ -15,10 +15,9 @@ API_SECRET = os.getenv('BINANCE_API_SECRET')
 # 🔗 Cliente Binance
 client = Client(API_KEY, API_SECRET)
 
-# ✅ Mensagem de confirmação ao iniciar
 print("✅ Bot iniciado com sucesso.")
 
-# 🔧 Configuração do bot
+# ⚙️ Configuração do bot
 symbols = ['SOLUSDT', 'ETHUSDT', 'XRPUSDT']
 timeframe = '1h'
 short_ma = 9
@@ -34,12 +33,12 @@ if not os.path.exists(log_file):
         writer = csv.writer(f)
         writer.writerow(['timestamp', 'symbol', 'side', 'entry_price', 'stop_loss', 'take_profit', 'quantity'])
 
-# 🕐 Função para obter dados de candles
+# 📊 Função para obter candles
 def get_klines(symbol, interval, limit=100):
     try:
         klines = client.get_klines(symbol=symbol, interval=interval, limit=limit)
         return [{
-            'open_time': datetime.datetime.fromtimestamp(k[0]/1000),
+            'open_time': datetime.datetime.fromtimestamp(k[0] / 1000),
             'open': float(k[1]),
             'high': float(k[2]),
             'low': float(k[3]),
@@ -47,17 +46,17 @@ def get_klines(symbol, interval, limit=100):
             'volume': float(k[5])
         } for k in klines]
     except Exception as e:
-        print(f"Erro ao obter klines para {symbol}:", e)
+        print(f"❌ Erro ao obter klines para {symbol}: {e}")
         return []
 
-# 🧠 Função de lógica da estratégia (simplificada)
+# 🧠 Função para cálculo de média
 def calculate_ma(candles, period):
     closes = [c['close'] for c in candles]
     if len(closes) < period:
         return None
     return sum(closes[-period:]) / period
 
-# 🔄 Loop principal
+# ▶️ Função principal do bot
 def run_bot():
     while True:
         for symbol in symbols:
@@ -72,6 +71,7 @@ def run_bot():
                 continue
 
             last_close = candles[-1]['close']
+            direction = None
             if ema_short > ema_long:
                 direction = 'BUY'
             elif ema_short < ema_long:
@@ -84,14 +84,24 @@ def run_bot():
             quantity = Decimal(risk_usdt / abs(last_close - stop_loss)).quantize(Decimal('.0001'), rounding=ROUND_DOWN)
 
             try:
-                print(f"{datetime.datetime.now()} | {symbol} | {direction} | Entry: {last_close:.3f} | SL: {stop_loss:.3f} | TP: {take_profit:.3f} | Qty: {quantity}")
+                print(f"{datetime.datetime.now()} | {symbol} | {direction} | Entry: {last_close:.3f} | SL: {stop_loss:.3f} | TP: {take_profit:.3f} | Qty: {float(quantity):.3f}")
+
+                # ✅ Executar ordem no mercado FUTUROS
+                order = client.futures_create_order(
+                    symbol=symbol,
+                    side=SIDE_BUY if direction == 'BUY' else SIDE_SELL,
+                    type=ORDER_TYPE_MARKET,
+                    quantity=float(quantity)
+                )
+                print(f"✅ Ordem executada: {order['side']} {symbol} - Qty: {quantity}")
+
+                # 📝 Salvar no log
                 with open(log_file, mode='a', newline='') as f:
                     writer = csv.writer(f)
                     writer.writerow([datetime.datetime.now(), symbol, direction, last_close, stop_loss, take_profit, float(quantity)])
             except Exception as e:
-                print("Erro ao registar trade:", e)
+                print(f"❌ Erro ao registar trade: {e}")
 
-        time.sleep(300)  # Aguarda 5 minutos antes da próxima iteração
+        time.sleep(300)  # ⏱️ Aguarda 5 minutos
 
 if __name__ == '__main__':
-    run_bot()
