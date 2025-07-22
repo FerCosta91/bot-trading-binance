@@ -20,7 +20,7 @@ print("🤖 Bot iniciado com sucesso.")
 
 # ⚙️ Configurações
 symbols = ['SOLUSDT', 'ETHUSDT', 'XRPUSDT']
-timeframe = '1h'
+timeframe = '15m'
 short_ma = 9
 long_ma = 21
 risk_usdt = 1
@@ -35,7 +35,7 @@ if not os.path.exists(log_file):
 
 def get_klines(symbol, interval, limit=100):
     try:
-        klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
+        klines = client.futures_klines(symbol=symbol, interval=interval, limit=500)
         return klines
     except Exception as e:
         print(f"Erro ao buscar dados de {symbol}: {e}")
